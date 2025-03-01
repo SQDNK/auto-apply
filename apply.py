@@ -13,13 +13,15 @@ def tryBS():
     #r = requests.get(URL)
 
     options = Options()
-    options.add_argument('--headless')
-    options.add_argument('--disable-gpu')
+    #options.add_argument('--headless')
+    #options.add_argument('--disable-gpu')
     driver = webdriver.Firefox(options=options)
     driver.get(URL)
     page = driver.page_source
 
     soup = BeautifulSoup(page, 'html.parser')
+    
+    wait = WebDriverWait(driver, 10)
 
     topLevel = soup.find_all("span")
     #print(topLevel)
@@ -27,20 +29,32 @@ def tryBS():
         for iframe in el.find_all("iframe"):
             #WebDriverWait(driver, 30).until(EC.frame_to_be_available_and_switch_to_it(iframe['id']))
 
+            #switch to frame for both BS and Sel
             url = iframe.attrs['src']
             page = requests.get(url).content
             soup = BeautifulSoup(page, 'html.parser')
-
-            span = soup.find_all("span")
-            print(span)
-
-            #driver.switch_to.frame(iframe['id'])
+            driver.switch_to.frame(driver.find_element(By.ID, iframe['id']))
+            
+            #TODO: not all elements have "button" in class attribute, or even a class attribute 
+            apply_window = driver.current_window_handle
+            for el in soup.select('*[class*="Button"]'): #also check for href
+                wait.until(EC.element_to_be_clickable((By.CLASS_NAME, el['class'][0]))).click()
+                break
+                 
+            '''  
+            wait.until(EC.number_of_windows_to_be(2))
+            # Loop through until we find a new window handle
+            for window_handle in driver.window_handles:
+                if window_handle != apply_window:
+                    driver.switch_to.window(window_handle)
+                    break
+            '''
 
             #soup needs to be reset
             #leave frame
-            driver.switch_to.default_content()
+            #driver.switch_to.default_content()
 
-    driver.quit()
+    #driver.quit()
 
 def trySel():
     driver = webdriver.Firefox()
