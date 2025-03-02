@@ -4,6 +4,8 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.firefox.options import Options
 from selenium.webdriver.support.wait import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
+from selenium.webdriver import ActionChains
+from selenium.webdriver.common.actions.action_builder import ActionBuilder
 import requests
 from bs4 import BeautifulSoup
 import time
@@ -38,9 +40,27 @@ def tryBS():
             #TODO: not all elements have "button" in class attribute, or even a class attribute 
             apply_window = driver.current_window_handle
             for el in soup.select('*[class*="Button"]'): #also check for href
-                wait.until(EC.element_to_be_clickable((By.CLASS_NAME, el['class'][0]))).click()
+                wait.until(EC.element_to_be_clickable((By.CLASS_NAME, el['class'][0]))).click() #clean up
                 break
                  
+            soup = BeautifulSoup(driver.page_source, 'html.parser')
+            #inputs = driver.find_elements(By.XPATH, "//form")
+            
+            # so, we could just assume there is one form per page
+            # TODO: checking if "email" is in el.attrs.items() does something weird 
+            inputs = soup.form.find_all("input") 
+            for el in inputs:
+                if el['type'] == "email":
+                    driver.find_element(By.ID, el['id']).send_keys("hsliu.021@gmail.com")
+                elif el['type'] == "checkbox":
+                    # click on the input or the label OR both?? 
+                    
+                    check = driver.find_element(By.ID, el['id'])
+                    driver.execute_script("arguments[0].click();", check)
+                elif el['type'] == "submit":
+                    # assume other inputs have run first
+                    driver.execute_script("arguments[0].click();", driver.find_element(By.ID, el['id']))
+            
             '''  
             wait.until(EC.number_of_windows_to_be(2))
             # Loop through until we find a new window handle
