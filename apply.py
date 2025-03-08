@@ -10,9 +10,10 @@ import requests
 from bs4 import BeautifulSoup
 import time
 import os 
+import re
 
 def stringExists(str, el):
-    if str in el['id'] or str in el['name']:
+    if str in el['id'] or str in el['name'] or str in el['class']:
         return True
     return False
 
@@ -25,6 +26,13 @@ def fillForm(inputs):
 def findIFrame(soup):
     # if iframe nested in span, can only access it from span? 
     spans = soup.find_all("span")
+    
+    # DEBUG
+    print(spans)
+    for span in spans:
+        print(span.find_all("iframe"))
+    #
+    
     for span in spans:
         for iframe in span.find_all("iframe"):
             # try first frame?
@@ -39,13 +47,38 @@ def switchToFrame(iframe, driver):
     driver.switch_to.frame(driver.find_element(By.ID, iframe['id']))
     
     return soup
+
+def findEleBySoup(soup):
+    # TODO: some elements have custom attributes. maybe the best strategy is to
+    # find by text 
+    ele = soup.find("button", string=re.compile("create", re.IGNORECASE))
+    print(ele)
+    return ele
             
-def tryNonIFrame():
-    pass
+def workday():
+    URL = "https://uasys.wd5.myworkdayjobs.com/en-US/uasys/login?redirect=%2Fen-US%2Fuasys%2Fjob%2FFayetteville%2FTechnology-Solutions-Specialist_R0068543%2Fapply%2FautofillWithResume"
+    
+    options = Options()
+    #options.add_argument('--headless')
+    #options.add_argument('--disable-gpu')
+    driver = webdriver.Firefox(options=options)
+    wait = WebDriverWait(driver, 10)
+    driver.get(URL)
+    wait.until(EC.visibility_of_element_located((By.CSS_SELECTOR, "form")))
+    page = driver.page_source
+    soup = BeautifulSoup(page, 'html.parser')
+    
+    print(soup.find_all("button"))
+    
+    soupEle = findEleBySoup(soup)    
+    # TODO: modularize 
+    driver.execute_script("arguments[0].click();", driver.find_element(By.ID, soupEle['class']))
+    
 
 def tryBS():
-    URL = "https://homeoffice-na-urbn.icims.com/jobs/14391/job?utm_source=hiringcafe_integration&iis=Job+Board&iisn=HiringCafe&mobile=false&width=1249&height=500&bga=true&needsRedirect=false&jan1offset=-420&jun1offset=-360"
+    oldURL = "https://homeoffice-na-urbn.icims.com/jobs/14391/job?utm_source=hiringcafe_integration&iis=Job+Board&iisn=HiringCafe&mobile=false&width=1249&height=500&bga=true&needsRedirect=false&jan1offset=-420&jun1offset=-360"
     #r = requests.get(URL)
+    URL = "https://uasys.wd5.myworkdayjobs.com/en-US/uasys/login?redirect=%2Fen-US%2Fuasys%2Fjob%2FFayetteville%2FTechnology-Solutions-Specialist_R0068543%2Fapply%2FautofillWithResume"
 
     options = Options()
     #options.add_argument('--headless')
@@ -67,8 +100,14 @@ def tryBS():
     for el in soup.select('*[class*="Button"]'): #also check for href
         wait.until(EC.element_to_be_clickable((By.CLASS_NAME, el['class'][0]))).click() #clean up
         break
-            
+    
     soup = BeautifulSoup(driver.page_source, 'html.parser')
+    print("should have entered consent page")
+            
+    iframe = findIFrame(soup)
+    if iframe: 
+        soup = switchToFrame(iframe, driver)
+        
     #inputs = driver.find_elements(By.XPATH, "//form")
     
     # so, we could just assume there is one form per page
@@ -79,24 +118,30 @@ def tryBS():
             driver.find_element(By.ID, el['id']).send_keys("hsliu.021@gmail.com")
         elif el['type'] == "checkbox":
             # click on the input or the label OR both?? 
-            
             check = driver.find_element(By.ID, el['id'])
             driver.execute_script("arguments[0].click();", check)
         elif el['type'] == "submit":
             # assume necessary inputs have already run 
+            wait.until(EC.element_to_be_clickable((By.ID, el['id'])))
             driver.execute_script("arguments[0].click();", driver.find_element(By.ID, el['id']))
+            wait.until(EC.visibility_of_element_located((By.CSS_SELECTOR, "*[type='file' i]")))
+            
             break 
+        
+    print("should have entered candidate profile page")
             
     # TODO: re-format for modularity
     
-    # specific wait after submitting a form 
-    #wait.until(EC.visibility_of_element_located((By.CSS_SELECTOR, "[type*='file' i]")))
-    
-    # however, this is a new iframe
+    # this might be a new iframe
     iframe = findIFrame(soup)
     if iframe:
         print("hello")
         soup = switchToFrame(iframe, driver)
+        
+    #print(driver.page_source)
+        
+    # specific wait after submitting a form 
+    wait.until(EC.visibility_of_element_located((By.CSS_SELECTOR, "*[type='file' i]")))
         
     #soup = BeautifulSoup(driver.page_source, 'html.parser')
     inputs = soup.form.find_all("input") 
@@ -139,4 +184,4 @@ def trySel():
     driver.close()
 
 if __name__ == "__main__":
-    tryBS()
+    workday()
