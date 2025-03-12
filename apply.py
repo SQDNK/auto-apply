@@ -11,17 +11,6 @@ from bs4 import BeautifulSoup
 import time
 import os 
 import re
-
-def stringExists(str, el):
-    if str in el['id'] or str in el['name'] or str in el['class']:
-        return True
-    return False
-
-def fillForm(inputs):
-    for el in inputs:
-        if el['type'] == "file" and stringExists("resume", el):
-            upload_resume = os.path.abspath("Desktop/Holly_Liu_Resume.pdf")
-            el.send_keys(upload_resume)
             
 def findIFrame(soup):
     # if iframe nested in span, can only access it from span? 
@@ -48,12 +37,58 @@ def switchToFrame(iframe, driver):
     
     return soup
 
-def findEleBySoup(soup):
-    # TODO: some elements have custom attributes. maybe the best strategy is to
-    # find by text 
-    ele = soup.find("button", string=re.compile("create", re.IGNORECASE))
-    print(ele)
-    return ele
+def findEle(soup, tag, str):
+    # TODO: list other searches 
+    eleStr = soup.find(tag, string=re.compile(str, re.IGNORECASE))
+    eleAttr = soup.find(tag, type=str)
+    return eleStr or eleAttr or None
+
+#TODO: method signature 
+def click(driver, soupEle):
+    for key in soupEle.attrs:
+        if key == "class":
+            driver.execute_script("arguments[0].click();", driver.find_element(By.CLASS_NAME, soupEle['class'][0]))
+            return
+        if key == "id":
+            driver.execute_script("arguments[0].click();", driver.find_element(By.ID, soupEle['id']))
+            return 
+            
+def sendKeys(driver, soupEle, content):
+    for key in soupEle.attrs:
+        if key == "class":
+            driver.find_element(By.CLASS_NAME, soupEle['class'][0]).send_keys(content)
+            return
+        if key == "id":
+            driver.find_element(By.ID, soupEle['id']).send_keys(content)
+            return 
+        
+def setSoup(driver, wait, uniqueEle):
+    wait.until(EC.visibility_of_element_located((By.CSS_SELECTOR, uniqueEle)))
+    soup = BeautifulSoup(driver.page_source, 'html.parser')
+    return soup
+
+def stringExists(str, el):
+    #TODO: 1) you can either list out the values of the dict OR get key, value pair 
+    if str in el.attrs.values():
+        return True
+    return False
+
+def fillForm(driver, inputs):
+    #TODO: some checks may not be unique 
+    #TODO: respond to errors sent by website
+    for el in inputs:
+        if el['type'] == "file" and stringExists("resume", el):
+            upload_resume = os.path.abspath("Desktop/Holly_Liu_Resume.pdf")
+            el.send_keys(upload_resume)
+            
+        if stringExists("email", el):
+            sendKeys(driver, el, "hsliu.021@gmail.com")
+            
+        if stringExists("password", el) or stringExists("verify", el):
+            sendKeys(driver, el, "!Ducked012345")
+            
+        if stringExists("checkbox", el):
+            click(driver, el)
             
 def workday():
     URL = "https://uasys.wd5.myworkdayjobs.com/en-US/uasys/login?redirect=%2Fen-US%2Fuasys%2Fjob%2FFayetteville%2FTechnology-Solutions-Specialist_R0068543%2Fapply%2FautofillWithResume"
@@ -64,16 +99,24 @@ def workday():
     driver = webdriver.Firefox(options=options)
     wait = WebDriverWait(driver, 10)
     driver.get(URL)
-    wait.until(EC.visibility_of_element_located((By.CSS_SELECTOR, "form")))
-    page = driver.page_source
-    soup = BeautifulSoup(page, 'html.parser')
+    soup = setSoup(driver, wait, "form")
+        
+    soupEle = findEle(soup, "button", "create")    
+    if soupEle:
+        click(driver, soupEle)
+    else:
+        print("Did not find element")
+        
+    soup = setSoup(driver, wait, "form") #TODO: this might check for old form
     
-    print(soup.find_all("button"))
-    
-    soupEle = findEleBySoup(soup)    
-    # TODO: modularize 
-    driver.execute_script("arguments[0].click();", driver.find_element(By.ID, soupEle['class']))
-    
+    # TODO: 1) check for specific elements to fill out, known beforehand b/c workday follows same format OR
+    # 2) check for all inputs
+    fillForm(driver, soup.find_all("input"))
+    soupEle = findEle(soup, "*", "create")
+    if soupEle:
+        click(driver, soupEle)
+    else:
+        print("Did not find element")
 
 def tryBS():
     oldURL = "https://homeoffice-na-urbn.icims.com/jobs/14391/job?utm_source=hiringcafe_integration&iis=Job+Board&iisn=HiringCafe&mobile=false&width=1249&height=500&bga=true&needsRedirect=false&jan1offset=-420&jun1offset=-360"
